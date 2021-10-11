@@ -1,15 +1,11 @@
-from __future__ import unicode_literals
 import os
 import shutil
 import json
 import ffmpeg
 import time
 import requests
-import youtube_dl
 import discord
 from discord.ext import commands
-
-ytdl = youtube_dl.YoutubeDL()
 
 bot = commands.Bot(command_prefix = "!")
 
