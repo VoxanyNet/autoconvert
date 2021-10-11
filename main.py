@@ -76,4 +76,4 @@ async def on_message(message):
         await ctx.send("Something went wrong during conversion.")
 
 
-bot.run("ODkzNjE1NDQ2NTMwNjAwOTYx.YVeCPQ.7fW21fpAzd1DQZhrdB79TIANUuo")
+bot.run("I never push tokens to GitHub ever")
