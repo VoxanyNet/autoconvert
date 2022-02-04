@@ -1,6 +1,5 @@
 {
   "mov": "mp4",
-  "HEIC": "png",
   "avi": "mp4",
   "flv": "mp4",
   "m4v": "mp4",
@@ -10,5 +9,6 @@
   "m4a": "mp3",
   "m4r": "mp3",
   "tiff": "png",
+  "tif": "png",
   "bmp": "png"
 }
