@@ -61,7 +61,7 @@ async def convert_attachments(message, requester = None):
                         notify_message = await message.channel.send(f"🔄 Converting **{extension}** to **{target_extension}**")
 
                         # Create unique filename
-                        download_filename = f"{int(time.time())}.{extension}"
+                        download_filename = f"{str(time.time())}.{extension}"
 
                         # Makes request
                         r = requests.get(str(attachment), stream=True)
@@ -204,6 +204,9 @@ async def on_reaction_add(reaction, user):
     # Delete conversion
     if reaction.emoji == "🗑️":
 
+        # Checks to see if user is admin, as it will allow them to delete any user's conversion
+        reaction.message.guild.get_permissions
+
         # Gets the original unconverted message that the conversion is referencing
         reference_message = await reaction.message.channel.fetch_message(reaction.message.reference.message_id)
         # HOLY CRAP THAT IS A MOUTHFUL
@@ -232,3 +235,4 @@ async def on_reaction_add(reaction, user):
             cooldowns[user.id] = time.time()
 
 bot.run("ODkzNjE1NDQ2NTMwNjAwOTYx.YVeCPQ.eV2Xn7jq6hwZ3SkcovVvjhdKLC4")
+bot.run("token")
