@@ -11,6 +11,14 @@ from discord.ext import commands
 import discord.utils
 import youtube_dl
 
+from exceptions import NoTokenError
+
+with open("token.txt", "r") as file:
+    TOKEN = file.read()
+
+if TOKEN == "":
+    raise NoTokenError("You must supply a Discord API token in the token.txt file!")
+
 # Stores trashcan notification cooldowns
 cooldowns = {}
 
@@ -204,15 +212,14 @@ async def on_reaction_add(reaction, user):
     # Delete conversion
     if reaction.emoji == "🗑️":
 
-        # Checks to see if user is admin, as it will allow them to delete any user's conversion
-        reaction.message.guild.get_permissions
+        print(reaction.message.author.guild_permissions.administrator)
 
         # Gets the original unconverted message that the conversion is referencing
         reference_message = await reaction.message.channel.fetch_message(reaction.message.reference.message_id)
         # HOLY CRAP THAT IS A MOUTHFUL
 
-        # If the reaction is from who sent the original message (that was converted)
-        if user.id == reference_message.author.id:
+        # If the reaction is from who sent the original message (that was converted) or is an admin
+        if user.id == reference_message.author.id or reaction.message.author.guild_permissions.administrator:
             await reaction.message.delete()
 
         # If the user was not the one who sent the original message
@@ -234,5 +241,4 @@ async def on_reaction_add(reaction, user):
 
             cooldowns[user.id] = time.time()
 
-bot.run("ODkzNjE1NDQ2NTMwNjAwOTYx.YVeCPQ.eV2Xn7jq6hwZ3SkcovVvjhdKLC4")
-bot.run("token")
+bot.run(TOKEN)
