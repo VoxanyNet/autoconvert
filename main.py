@@ -61,12 +61,14 @@ async def convert_attachments(message, requester = None):
             # Checks to see if the file ends with any of the incompatible extensions
             for extension in incompatible_files.keys():
                 if str(attachment).endswith(extension):
-                    async with message.channel.typing():
-                        # Gets the target extension from the incompatible files dictionary
-                        target_extension = incompatible_files[extension]
+                    # Gets the target extension from the incompatible files dictionary
+                    target_extension = incompatible_files[extension]
 
-                        # Notifies user that we are converting their file
-                        notify_message = await message.channel.send(f"🔄 Converting **{extension}** to **{target_extension}**")
+                    # Notifies user that we are converting their file
+                    notify_message = await message.channel.send(f"🔄 Converting **{extension}** to **{target_extension}**")
+
+                    async with message.channel.typing(): # Use typing as an indicator
+                    # Typing indicator goes away once a message is sent
 
                         # Create unique filename
                         download_filename = f"{str(time.time())}.{extension}"
@@ -101,12 +103,14 @@ async def convert_attachments(message, requester = None):
                         except:
                             conversion_message = await message.reply(f"{requester_mention}**Something went wrong with uploading the conversion.**\n\nThis probably means the conversion result was too large to be sent.",mention_author=False)
 
-                        await notify_message.delete()
+                    await notify_message.delete()
 
-                        await conversion_message.add_reaction("🗑️")
+                    await conversion_message.add_reaction("🗑️")
 
-                        os.remove(download_filename)
-                        os.remove(output_file_name)
+                    print("exited with statement")
+
+                    os.remove(download_filename)
+                    os.remove(output_file_name)
 
                     break
 
