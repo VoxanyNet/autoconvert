@@ -118,59 +118,57 @@ async def convert_attachments(message, requester = None):
 async def on_ready():
     print("Started")
 
-@bot.event
-async def on_message(message):
+@bot.slash_command(description="Convert referenced video", guild_ids=[730614557600383066])
+async def convert(ctx, target_extension = None):
 
-    # Checks if the bot was manually mentioned
-    if bot.user in message.mentions:
-        # Checks to see if a message to convert was referenced
-        if not message.reference:
-            await message.reply("You did not reference a message to be converted!")
-            return
+    # Checks to see if a message to convert was referenced
+    if not message.reference:
+        await message.reply("You did not reference a message to be converted!")
+        return
 
-        # Retrieve message to be converted
-        referenced_message = await message.channel.fetch_message(message.reference.message_id)
+    # Retrieve message to be converted
+    referenced_message = await message.channel.fetch_message(message.reference.message_id)
 
-        if not referenced_message.attachments: # Checks if the message has the attribute "attachment"
-            await message.reply("Message has no attachments!")
-            return
+    if not referenced_message.attachments: # Checks if the message has the attribute "attachment"
+        await message.reply("Message has no attachments!")
+        return
 
-        # Loads incompatible file formats
-        file = open("incompatibles.json","r")
-        incompatible_files = json.load(file)
-        file.close()
+    # Loads incompatible file formats
+    file = open("incompatibles.json","r")
+    incompatible_files = json.load(file)
+    file.close()
 
-        for attachment in referenced_message.attachments:
+    for attachment in referenced_message.attachments:
 
-            # If the attachment comes from discord's servers
-            if not str(attachment).startswith("https://cdn.discordapp.com/attachments"):
-                await message.reply(f"{attachment} could not be converted because it did not come from Discord's servers!")
-                continue
+        # If the attachment comes from discord's servers
+        if not str(attachment).startswith("https://cdn.discordapp.com/attachments"):
+            await message.reply(f"{attachment} could not be converted because it did not come from Discord's servers!")
+            continue
 
-            # Checks to see if the file ends with any of the incompatible extensions
-            for extension in incompatible_files.keys():
-                if str(attachment).endswith(extension):
+        # Checks to see if the file ends with any of the incompatible extensions
+        for extension in incompatible_files.keys():
+            if str(attachment).endswith(extension):
 
-                    # Adds confirmation button
-                    await convert_attachments(referenced_message, message.author)
+                # Adds confirmation button
+                await convert_attachments(referenced_message, message.author)
 
-                    # If we find at least one attachment that
-                    # could be converted we dont need to check
-                    # for any others, thus the return
-                    return
+                # If we find at least one attachment that
+                # could be converted we dont need to check
+                # for any others, thus the return
+                return
 
-            # If we get this point in the code, it means we couldn't find any compatible conversions
+        # If we get this point in the code, it means we couldn't find any compatible conversions
 
-            # We will try to extract the file type so we can reply specifying the file type we cant convert.
-            # Sometimes this doesnt work because a file wont have an extension we will put it in a try-except block.
-            try:
-                failed_extension = f" **{str(attachment).split('.')[-1]}**"
-            except:
-                failed_extension = ""
+        # We will try to extract the file type so we can reply specifying the file type we cant convert.
+        # Sometimes this doesnt work because a file wont have an extension we will put it in a try-except block.
+        try:
+            failed_extension = f" **{str(attachment).split('.')[-1]}**"
+        except:
+            failed_extension = ""
 
-                raise
+            raise
 
-            await message.reply(f"Unable to convert file type{failed_extension}.")
+        await message.reply(f"Unable to convert file type{failed_extension}.")
 
     # Automatically places a convert button on message detected to be convertible
     for attachment in message.attachments:
