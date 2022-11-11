@@ -48,7 +48,7 @@ def convert_attachment(attachment: str, target_extension: str) -> BytesIO:
     output_filename = f"{download_filename.split('.')[0]}.{target_extension}"
 
     # Converts file
-    stream = ffmpeg.output(stream,output_filename)
+    stream = ffmpeg.output(stream, output_filename)
 
     ffmpeg.run(stream)
 
@@ -65,6 +65,7 @@ def convert_attachment(attachment: str, target_extension: str) -> BytesIO:
 
     # return the converted file bytes
     return converted_file
+
 
 @bot.slash_command(description="Convert the attachment of a message")
 async def convert(ctx, message_url, target_extension=None):
