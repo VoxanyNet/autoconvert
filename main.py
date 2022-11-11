@@ -63,10 +63,6 @@ def convert_attachment(attachment: str, target_extension: str) -> BytesIO:
     # delete the converted file
     os.remove(output_filename)
 
-    print(type(
-        converted_file
-    ))
-
     # return the converted file bytes
     return converted_file
 
