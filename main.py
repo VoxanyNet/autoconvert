@@ -15,7 +15,7 @@ with open("token.txt", "r") as file:
     TOKEN = file.read()
 
 if TOKEN == "":
-    raise NoTokenError("You must supply a Discord API token in the token.txt file!")
+    raise NoTokenError("You must supply a Discord API token in the token.txt file.")
 
 # create bot object
 intents = discord.Intents.default()
