@@ -1,15 +1,13 @@
 import os
 import shutil
 import json
-import ffmpeg
 import time
+from io import BytesIO
+
+import ffmpeg
 import requests
-from collections import defaultdict
 
 import discord
-from discord.ext import commands
-import discord.utils
-import youtube_dl
 
 from exceptions import NoTokenError
 
@@ -17,230 +15,124 @@ with open("token.txt", "r") as file:
     TOKEN = file.read()
 
 if TOKEN == "":
-    raise NoTokenError("You must supply a Discord API token in the token.txt file!")
+    raise NoTokenError("You must supply a Discord API token in the token.txt file.")
 
-# Stores trashcan notification cooldowns
-cooldowns = {}
+# create bot object
+intents = discord.Intents.default()
+bot = discord.Bot(intents=intents)
 
-bot = commands.Bot(command_prefix = "!")
 
-bot.ytdl = youtube_dl.YoutubeDL({"outtmpl": "downloads/%(id)s.%(ext)s"})
+def convert_attachment(attachment: str, target_extension: str) -> BytesIO:
 
-async def reset_reaction(emoji_to_remove, message):
+    # extract this file's original extension
+    original_extension = attachment.split('.')[-1]
 
-    users_to_remove = []
+    # download the attachment with a unique name
+    download_filename = f"{str(time.time())}.{original_extension}"
 
-    # This creates a list of the users who reacted that doesn't include the bot
-    for _reaction in message.reactions:
-        if _reaction.emoji == emoji_to_remove:
-            async for user in _reaction.users():
-                # We only want to remove reactions from other users
-                if user.id != message.author.id:
-                    users_to_remove.append(user)
+    # make a download request for the file
+    resp = requests.get(attachment, stream=True)
 
-    for user_id in users_to_remove:
-        await message.remove_reaction(emoji_to_remove,user)
+    # write the data we received to a file
+    with open(download_filename, "wb") as file:
 
-async def convert_attachments(message, requester = None):
+        resp.raw.decode_content = True
 
-    # If we are given the user who requested the conversion, we will mention them when its complete
-    if requester:
-        requester_mention = f"<@{requester.id}>\n"
-    else:
-        requester_mention = ""
+        # copies download data to disk
+        shutil.copyfileobj(resp.raw, file)
 
-    for attachment in message.attachments:
-        # If the attachment comes from discord's servers
-        if str(attachment).startswith("https://cdn.discordapp.com/attachments"):
+    # loads file into ffmpeg
+    stream = ffmpeg.input(download_filename)
 
-            # Loads incompatible file formats
-            file = open("incompatibles.json","r")
+    # Creates output filename
+    output_filename = f"{download_filename.split('.')[0]}.{target_extension}"
+
+    # Converts file
+    stream = ffmpeg.output(stream, output_filename)
+
+    ffmpeg.run(stream)
+
+    # load the converted file into bytes object
+    with open(output_filename, "rb") as file:
+        converted_file = BytesIO(
+            file.read()
+        )
+
+    # delete the original file
+    os.remove(download_filename)
+    # delete the converted file
+    os.remove(output_filename)
+
+    # return the converted file bytes
+    return converted_file
+
+
+@bot.slash_command(description="Convert the attachment of a message")
+async def convert(ctx, message_url, target_extension=None):
+
+    # the message ID is the last part of the URL
+    referenced_message_id = message_url.split("/")[-1]
+
+    # we will only convert messages that are in the same guild
+    referenced_message = await ctx.channel.fetch_message(referenced_message_id)
+
+    if not referenced_message.attachments:  # Checks if the message has the attribute "attachments"
+        await ctx.respond("Message has no attachments!", ephemeral=True)
+        return
+
+    # we only convert the first attachment
+    if len(referenced_message.attachments) > 1:
+        await ctx.respond("Message has more than one attachment, only converting the first one.", ephemeral=True)
+
+    attachment = referenced_message.attachments[0]
+
+    # make sure the attachment comes from discord's server because i dont trust 3rd parties!
+    if not attachment.url.startswith("https://cdn.discordapp.com/attachments"):
+
+        await ctx.respond(
+            f"{attachment.filename} could not be converted because it did not come from Discord's servers!",
+            ephemeral=True
+        )
+
+        return
+
+    # this file's extension
+    extension = attachment.url.split('.')[-1].lower()
+
+    # if the user did not supply a target extension, we look up a suitable one
+    if target_extension is None:
+
+        # loads suitable format map
+        with open("incompatibles.json", "r") as file:
             incompatible_files = json.load(file)
-            file.close()
 
-            # Checks to see if the file ends with any of the incompatible extensions
-            for extension in incompatible_files.keys():
-                if str(attachment).endswith(extension):
-                    # Gets the target extension from the incompatible files dictionary
-                    target_extension = incompatible_files[extension]
-
-                    # Notifies user that we are converting their file
-                    notify_message = await message.channel.send(f"🔄 Converting **{extension}** to **{target_extension}**")
-
-                    async with message.channel.typing(): # Use typing as an indicator
-                    # Typing indicator goes away once a message is sent
-
-                        # Create unique filename
-                        download_filename = f"{str(time.time())}.{extension}"
-
-                        # Makes request
-                        r = requests.get(str(attachment), stream=True)
-
-                        # Opens downloaded file
-                        file = open(download_filename,"wb")
-                        r.raw.decode_content = True
-
-                        # Copies request data to file
-                        shutil.copyfileobj(r.raw, file)
-
-                        # Closes downloaded file
-                        file.close()
-
-                        # Loads file into ffmpeg
-                        stream = ffmpeg.input(download_filename)
-
-                        # Creates output filename
-                        output_file_name = f"{download_filename.split('.')[0]}.{target_extension}"
-
-                        # Converts file
-                        stream = ffmpeg.output(stream,output_file_name)
-
-                        ffmpeg.run(stream)
-
-                        # Sends converted file
-                        try:
-                            conversion_message = await message.reply(f"{requester_mention}✅ Converted **{extension}** to **{target_extension}**", file = discord.File(output_file_name), mention_author=False)
-                        except:
-                            conversion_message = await message.reply(f"{requester_mention}**Something went wrong with uploading the conversion.**\n\nThis probably means the conversion result was too large to be sent.",mention_author=False)
-
-                    await notify_message.delete()
-
-                    await conversion_message.add_reaction("🗑️")
-
-                    print("exited with statement")
-
-                    os.remove(download_filename)
-                    os.remove(output_file_name)
-
-                    break
-
-@bot.event
-async def on_ready():
-    print("Started")
-
-@bot.slash_command(description="Convert referenced video", guild_ids=[730614557600383066])
-async def convert(ctx, target_extension = None):
-
-    # Checks to see if a message to convert was referenced
-    if not message.reference:
-        await message.reply("You did not reference a message to be converted!")
-        return
-
-    # Retrieve message to be converted
-    referenced_message = await message.channel.fetch_message(message.reference.message_id)
-
-    if not referenced_message.attachments: # Checks if the message has the attribute "attachment"
-        await message.reply("Message has no attachments!")
-        return
-
-    # Loads incompatible file formats
-    file = open("incompatibles.json","r")
-    incompatible_files = json.load(file)
-    file.close()
-
-    for attachment in referenced_message.attachments:
-
-        # If the attachment comes from discord's servers
-        if not str(attachment).startswith("https://cdn.discordapp.com/attachments"):
-            await message.reply(f"{attachment} could not be converted because it did not come from Discord's servers!")
-            continue
-
-        # Checks to see if the file ends with any of the incompatible extensions
-        for extension in incompatible_files.keys():
-            if str(attachment).endswith(extension):
-
-                # Adds confirmation button
-                await convert_attachments(referenced_message, message.author)
-
-                # If we find at least one attachment that
-                # could be converted we dont need to check
-                # for any others, thus the return
-                return
-
-        # If we get this point in the code, it means we couldn't find any compatible conversions
-
-        # We will try to extract the file type so we can reply specifying the file type we cant convert.
-        # Sometimes this doesnt work because a file wont have an extension we will put it in a try-except block.
+        # lookup suitable format
         try:
-            failed_extension = f" **{str(attachment).split('.')[-1]}**"
-        except:
-            failed_extension = ""
+            target_extension = incompatible_files[extension]
 
-            raise
+        # if we cannot find a suitable file format, then we notify them
+        except KeyError:
+            await ctx.respond(f"Unable to convert file type **{extension}**.", ephemeral=True)
 
-        await message.reply(f"Unable to convert file type{failed_extension}.")
+            return
 
-    # Automatically places a convert button on message detected to be convertible
-    for attachment in message.attachments:
-        # If the attachment comes from discord's servers
-        if str(attachment).startswith("https://cdn.discordapp.com/attachments"):
+    # convert the attachments to target extension
+    converted_file = convert_attachment(
+        attachment.url,
+        target_extension=target_extension
+    )
 
-            # Loads incompatible file formats
-            file = open("incompatibles.json","r")
-            incompatible_files = json.load(file)
-            file.close()
+    # put converted file into Discord file object
+    converted_attachment = discord.File(
+        fp=converted_file,
+        filename=f"{attachment.filename}.{target_extension}",
+        spoiler=attachment.is_spoiler(),
+        description=attachment.description
+    )
 
-            # Checks to see if the file ends with any of the incompatible extensions
-            for extension in incompatible_files.keys():
-                if str(attachment).endswith(extension):
-
-                    # Adds confirmation button
-                    await message.add_reaction("🔄")
-
-                    # If we find at least one attachment that
-                    # could be converted we dont need to check
-                    # for any others, thus the return
-                    return
-
-@bot.event
-async def on_reaction_add(reaction, user):
-
-    # We only care about reactions if the bot was the first one to react
-    if bot.user not in await reaction.users().flatten():
-        return
-
-    # We also dont care about reactions sent from the bot
-    if bot.user.id == user.id:
-        return
-
-    # Confirmed conversion
-    if reaction.emoji == "🔄":
-
-        await reset_reaction("🔄", reaction.message)
-
-        await convert_attachments(reaction.message, requester = user)
-
-
-    # Delete conversion
-    if reaction.emoji == "🗑️":
-
-        print(reaction.message.author.guild_permissions.administrator)
-
-        # Gets the original unconverted message that the conversion is referencing
-        reference_message = await reaction.message.channel.fetch_message(reaction.message.reference.message_id)
-        # HOLY CRAP THAT IS A MOUTHFUL
-
-        # If the reaction is from who sent the original message (that was converted) or is an admin
-        if user.id == reference_message.author.id or reaction.message.author.guild_permissions.administrator:
-            await reaction.message.delete()
-
-        # If the user was not the one who sent the original message
-        else:
-            await reset_reaction("🗑️", reaction.message)
-
-            # Calculates the time elapsed since they last hit the trashcan
-            if user.id not in cooldowns:
-                cooldowns[user.id] = time.time()
-
-            else:
-                elapsed = time.time() - cooldowns[user.id]
-
-                # If it has been less than 10 minutes, we dont send the notification
-                if elapsed > 600:
-                    return
-
-            await user.send(f"Only the sender of a message can delete its conversion.\n\nLink to original message: {reaction.message.jump_url}")
-
-            cooldowns[user.id] = time.time()
+    # send all the converted attachments
+    await ctx.respond(
+        file=converted_attachment
+    )
 
 bot.run(TOKEN)
