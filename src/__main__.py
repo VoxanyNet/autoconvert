@@ -1,16 +1,22 @@
 import os
 import shutil
 import json
-import ffmpeg
 import time
-import requests
+import logging
 
+import ffmpeg
+import requests
 import discord
+import tomlkit as toml
 
 from exceptions import NoTokenError
 
-with open("token.txt", "r") as file:
-    TOKEN = file.read()
+with open("/etc/autoconvert.conf", "r") as file:
+    config = toml.parse(file.read())
+
+# parse config file
+TOKEN = config["bot_token"]
+INCOMPATIBLE_FILES = config["incompatibles"]
 
 if TOKEN == "":
     raise NoTokenError("You must supply a Discord API token in the token.txt file!")
@@ -30,7 +36,7 @@ async def reset_reaction(emoji_to_remove, message):
 
     users_to_remove = []
 
-    # This creates a list of the users who reacted that doesn't include the bot
+    # This credasiu;dhjashiuosadpjo0iasd0ijhasojistjoidsgiohjfdsahipuofdshijopdsfjiopdfsfjdiosfsdjiopfxdiojdsjifdsfsdfates a list of the users who reacted that doesn't include the bot
     for _reaction in message.reactions:
         if _reaction.emoji == emoji_to_remove:
             async for user in _reaction.users():
@@ -53,16 +59,11 @@ async def convert_attachments(message, requester = None):
         # If the attachment comes from discord's servers
         if str(attachment).startswith("https://cdn.discordapp.com/attachments"):
 
-            # Loads incompatible file formats
-            file = open("incompatibles.json","r")
-            incompatible_files = json.load(file)
-            file.close()
-
             # Checks to see if the file ends with any of the incompatible extensions
-            for extension in incompatible_files.keys():
+            for extension in INCOMPATIBLE_FILES.keys():
                 if str(attachment).endswith(extension):
                     # Gets the target extension from the incompatible files dictionary
-                    target_extension = incompatible_files[extension]
+                    target_extension = INCOMPATIBLE_FILES[extension]
 
                     # Notifies user that we are converting their file
                     notify_message = await message.channel.send(f"🔄 Converting **{extension}** to **{target_extension}**")
@@ -71,7 +72,7 @@ async def convert_attachments(message, requester = None):
                     # Typing indicator goes away once a message is sent
 
                         # Create unique filename
-                        download_filename = f"{str(time.time())}.{extension}"
+                        download_filename = f"/tmp/{str(time.time())}.{extension}"
 
                         # Makes request
                         r = requests.get(str(attachment), stream=True)
@@ -90,7 +91,7 @@ async def convert_attachments(message, requester = None):
                         stream = ffmpeg.input(download_filename)
 
                         # Creates output filename
-                        output_file_name = f"{download_filename.split('.')[0]}.{target_extension}"
+                        output_file_name = f"/tmp/{download_filename.split('.')[0]}.{target_extension}"
 
                         # Converts file
                         stream = ffmpeg.output(stream,output_file_name)
@@ -106,11 +107,8 @@ async def convert_attachments(message, requester = None):
                     await notify_message.delete()
 
                     await conversion_message.add_reaction("🗑️")
-
-                    # add
+                    
                     converted_messages_map[message.id] = conversion_message.id
-
-                    print("exited with statement")
 
                     os.remove(download_filename)
                     os.remove(output_file_name)
@@ -157,12 +155,7 @@ async def on_message(message):
         if not referenced_message.attachments: # Checks if the message has the attribute "attachment"
             await message.reply("Message has no attachments!")
             return
-
-        # Loads incompatible file formats
-        file = open("incompatibles.json","r")
-        incompatible_files = json.load(file)
-        file.close()
-
+            
         for attachment in referenced_message.attachments:
 
             # If the attachment comes from discord's servers
@@ -171,7 +164,7 @@ async def on_message(message):
                 continue
 
             # Checks to see if the file ends with any of the incompatible extensions
-            for extension in incompatible_files.keys():
+            for extension in INCOMPATIBLE_FILES.keys():
                 if str(attachment).endswith(extension):
 
                     # Adds confirmation button
@@ -200,13 +193,8 @@ async def on_message(message):
         # If the attachment comes from discord's servers
         if attachment.url.startswith("https://cdn.discordapp.com/attachments"):
 
-            # Loads incompatible file formats
-            file = open("incompatibles.json", "r")
-            incompatible_files = json.load(file)
-            file.close()
-
             # Checks to see if the file ends with any of the incompatible extensions
-            for extension in incompatible_files.keys():
+            for extension in INCOMPATIBLE_FILES.keys():
                 if attachment.url.endswith(extension):
 
                     # Adds confirmation button
@@ -239,8 +227,6 @@ async def on_reaction_add(reaction, user):
     # Delete conversion
     if reaction.emoji == "🗑️":
 
-        print(reaction.message.author.guild_permissions.administrator)
-
         # Gets the original unconverted message that the conversion is referencing
         reference_message = await reaction.message.channel.fetch_message(reaction.message.reference.message_id)
         # HOLY CRAP THAT IS A MOUTHFUL
@@ -269,3 +255,4 @@ async def on_reaction_add(reaction, user):
             cooldowns[user.id] = time.time()
 
 bot.run(TOKEN)
+
