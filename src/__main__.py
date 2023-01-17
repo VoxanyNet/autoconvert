@@ -18,10 +18,7 @@ with open("/etc/autoconvert.conf", "r") as file:
 TOKEN = config["bot_token"]
 INCOMPATIBLE_FILES = config["incompatibles"]
 
-if TOKEN == "":
-    raise NoTokenError("You must supply a Discord API token in the token.txt file!")
-
-# Stores trashcan notification cooldowns
+# stores trashcan notification cooldowns
 cooldowns = {}
 
 # stores the original messages that resulted in a conversion
@@ -36,7 +33,7 @@ async def reset_reaction(emoji_to_remove, message):
 
     users_to_remove = []
 
-    # This credasiu;dhjashiuosadpjo0iasd0ijhasojistjoidsgiohjfdsahipuofdshijopdsfjiopdfsfjdiosfsdjiopfxdiojdsjifdsfsdfates a list of the users who reacted that doesn't include the bot
+    # This creates a list of the users who reacted that doesn't include the bot
     for _reaction in message.reactions:
         if _reaction.emoji == emoji_to_remove:
             async for user in _reaction.users():
@@ -48,6 +45,9 @@ async def reset_reaction(emoji_to_remove, message):
         await message.remove_reaction(emoji_to_remove,user)
 
 async def convert_attachments(message, requester = None):
+
+    if not os.path.exists("/tmp/autoconvert"):
+        os.mkdir("/tmp/autoconvert")
 
     # If we are given the user who requested the conversion, we will mention them when its complete
     if requester:
@@ -72,7 +72,7 @@ async def convert_attachments(message, requester = None):
                     # Typing indicator goes away once a message is sent
 
                         # Create unique filename
-                        download_filename = f"/tmp/{str(time.time())}.{extension}"
+                        download_filename = f"/tmp/autoconvert/{str(time.time())}.{extension}"
 
                         # Makes request
                         r = requests.get(str(attachment), stream=True)
@@ -91,7 +91,7 @@ async def convert_attachments(message, requester = None):
                         stream = ffmpeg.input(download_filename)
 
                         # Creates output filename
-                        output_file_name = f"/tmp/{download_filename.split('.')[0]}.{target_extension}"
+                        output_file_name = f"{download_filename.split('.')[0]}.{target_extension}"
 
                         # Converts file
                         stream = ffmpeg.output(stream,output_file_name)

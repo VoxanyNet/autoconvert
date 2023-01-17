@@ -1,0 +1,12 @@
+[Unit]
+Description=AutoConvertBot
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/env python3 /usr/local/bin/autoconvertbot
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

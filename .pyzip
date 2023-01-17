@@ -1,0 +1,5 @@
+# default config file
+
+package_directory = "./src"
+
+output_path = "./pyzip/autoconvertbot"
